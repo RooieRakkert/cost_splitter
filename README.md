@@ -15,13 +15,19 @@ Interactive CLI tool for splitting shared expenses among a group of people.
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
-pip install -r requirements.txt
+pip install -e .
 ```
 
 ## Usage
 
 ```bash
 python -m cost_splitter
+```
+
+Or via the installed command:
+
+```bash
+cost-splitter
 ```
 
 ## How it works
@@ -38,6 +44,6 @@ python -m cost_splitter
 ## Running tests
 
 ```bash
-pip install pytest
-pytest tests/ -v
+pip install -e ".[dev]"
+pytest src/cost_splitter/tests/ -v
 ```

@@ -18,9 +18,11 @@ console = Console()
 
 _ACTION_KEYS: dict[str, str] = {
     "a": "add",
+    "e": "edit",
     "r": "report",
     "s": "settle",
     "d": "delete",
+    "p": "participant",
     "q": "quit",
 }
 
@@ -47,7 +49,7 @@ def _check_cancel(value: str) -> str:
 
 def prompt_text(message: str, **kwargs: object) -> str:
     result = inquirer.text(
-        message=f"{message} [dim](x to cancel)[/dim]",
+        message=f"{message} (x to cancel)",
         **kwargs,
     ).execute()
     return _check_cancel(result)
@@ -92,8 +94,10 @@ def prompt_action() -> str:
     console.print()
     console.print("[bold]What would you like to do?[/bold]")
     console.print("  [cyan](A)[/cyan] Add spending")
+    console.print("  [cyan](E)[/cyan] Edit spending")
     console.print("  [cyan](R)[/cyan] View report")
     console.print("  [cyan](S)[/cyan] Settle up")
+    console.print("  [cyan](P)[/cyan] Add participant")
     console.print("  [cyan](D)[/cyan] Delete spending")
     console.print("  [cyan](Q)[/cyan] Quit")
     console.print()
@@ -138,14 +142,24 @@ def display_report(report: Report) -> None:
     console.print(table)
 
 
-def display_settlement(transfers: list[Transfer]) -> None:
+def display_settlement(
+    transfers: list[Transfer], balances: dict[str, Decimal]
+) -> None:
     if not transfers:
         console.print(
             Panel("Everyone is settled up!", style="green", title="Settlement")
         )
         return
 
-    lines = [f"  {t.from_person} -> {t.to_person}: {t.amount:.2f}" for t in transfers]
+    lines = []
+    for t in transfers:
+        lines.append(f"  {t.from_person} -> {t.to_person}: {t.amount:.2f}")
+
+    settled = [p for p, b in balances.items() if b == 0]
+    if settled:
+        lines.append("")
+        for p in settled:
+            lines.append(f"  {p}: settled (no action needed)")
 
     console.print(Panel("\n".join(lines), title="Settlement", style="cyan"))
 
