@@ -161,10 +161,6 @@ def display_report(report: Report) -> None:
 
     console.print(table)
 
-
-def display_settlement(
-    transfers: list[Transfer], balances: dict[str, Decimal], report: Report
-) -> None:
     total_spent = sum(s.amount for s in report.spendings)
 
     paid_per_person: dict[str, Decimal] = {p: Decimal("0") for p in report.participants}
@@ -175,9 +171,9 @@ def display_settlement(
             for person, amount in s.custom_amounts.items():
                 owed_per_person[person] += amount
         else:
-            share = (s.amount / len(s.participants)).quantize(Decimal("0.01"))
+            per_share = (s.amount / len(s.participants)).quantize(Decimal("0.01"))
             for person in s.participants:
-                owed_per_person[person] += share
+                owed_per_person[person] += per_share
 
     console.print()
     summary = Table(title="Spending Summary", show_lines=False)
@@ -197,6 +193,10 @@ def display_settlement(
         individual.add_row(p, f"{owed_per_person[p]:.2f}")
     console.print(individual)
 
+
+def display_settlement(
+    transfers: list[Transfer], balances: dict[str, Decimal]
+) -> None:
     if not transfers:
         console.print(
             Panel("Everyone is settled up!", style="green", title="Settlement")
