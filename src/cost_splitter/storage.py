@@ -27,9 +27,6 @@ class ReportStorage:
     def list_reports(self) -> list[str]:
         return sorted(p.stem for p in self._dir.glob("*.json"))
 
-    def load_all(self) -> list[Report]:
-        return [self.load(slug) for slug in self.list_reports()]
-
     def delete(self, slug: str) -> None:
         p = self._path(slug)
         if not p.exists():

@@ -8,6 +8,8 @@ from decimal import Decimal  # noqa: TC003
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
+CENTS = Decimal("0.01")
+
 
 class Spending(BaseModel):
     description: str

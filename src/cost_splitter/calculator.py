@@ -4,9 +4,7 @@ from __future__ import annotations
 
 from decimal import ROUND_HALF_UP, Decimal
 
-from .models import Report, Transfer
-
-_CENTS = Decimal("0.01")
+from .models import CENTS, Report, Transfer
 
 
 def calculate_balances(report: Report) -> dict[str, Decimal]:
@@ -20,7 +18,7 @@ def calculate_balances(report: Report) -> dict[str, Decimal]:
                 balances[person] -= amount
         else:
             share = (spending.amount / len(spending.participants)).quantize(
-                _CENTS, rounding=ROUND_HALF_UP
+                CENTS, rounding=ROUND_HALF_UP
             )
             for i, person in enumerate(spending.participants):
                 if i == len(spending.participants) - 1:
@@ -55,7 +53,7 @@ def calculate_settlement(report: Report) -> list[Transfer]:
     while di < len(debtors) and ci < len(creditors):
         debtor, debt = debtors[di]
         creditor, credit = creditors[ci]
-        amount = min(debt, credit).quantize(_CENTS, rounding=ROUND_HALF_UP)
+        amount = min(debt, credit).quantize(CENTS, rounding=ROUND_HALF_UP)
 
         if amount > 0:
             transfers.append(

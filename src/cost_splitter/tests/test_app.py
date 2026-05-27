@@ -10,6 +10,7 @@ import pytest
 
 from .. import ui as _ui_module
 from ..app import CostSplitterApp
+from ..exceptions import Cancelled
 from ..models import Report, Spending
 from ..storage import ReportStorage
 
@@ -127,7 +128,9 @@ class TestAddSpending:
         report_with_spendings: Report,
     ) -> None:
         # First attempt: Custom 30+20=50 != 100, goes back to split type, second attempt Custom: 60+40=100
-        mock_text.side_effect = ["Drinks", "100.00", "30.00", "20.00", "60.00", "40.00"]
+        mock_text.side_effect = [
+            "Drinks", "100.00", "30.00", "20.00", "60.00", "40.00",
+        ]
         mock_select.side_effect = ["Jan", "Custom", "Custom"]
         mock_checkbox.return_value = ["Bouke", "Jan"]
 
@@ -178,7 +181,7 @@ class TestAddSpending:
         app: CostSplitterApp,
         report_with_spendings: Report,
     ) -> None:
-        # First attempt: Percentage 50+30=80 != 100%, goes back to split type, second attempt Percentage: 60+40=100%
+        # First: Percentage 50+30=80 != 100%, back to split type, second: 60+40=100%
         mock_text.side_effect = ["Drinks", "100.00", "50", "30", "60", "40"]
         mock_select.side_effect = ["Jan", "Percentage", "Percentage"]
         mock_checkbox.return_value = ["Bouke", "Jan"]
@@ -206,17 +209,15 @@ class TestDeleteSpending:
         loaded = app.storage.load("holiday")
         assert len(loaded.spendings) == 0
 
-    @patch(f"{_UI}.print_info")
-    def test_delete_spending_empty_report(
+    def test_delete_spending_empty_report_raises_cancelled(
         self,
-        mock_print: MagicMock,
         app: CostSplitterApp,
         storage: ReportStorage,
     ) -> None:
         r = Report(name="Empty", participants=["A"])
         storage.save(r)
-        app.delete_spending(r)
-        mock_print.assert_called()
+        with pytest.raises(Cancelled):
+            app.delete_spending(r)
 
 
 class TestViewReport:
@@ -381,14 +382,89 @@ class TestEditSpending:
         assert "Lisa" in loaded.spendings[0].participants
         assert loaded.spendings[0].amount == Decimal("80.00")
 
-    @patch(f"{_UI}.print_info")
-    def test_edit_empty_report(
+    def test_edit_empty_report_raises_cancelled(
         self,
-        mock_print: MagicMock,
         app: CostSplitterApp,
         storage: ReportStorage,
     ) -> None:
         r = Report(name="Empty", participants=["A"])
         storage.save(r)
-        app.edit_spending(r)
-        mock_print.assert_called()
+        with pytest.raises(Cancelled):
+            app.edit_spending(r)
+
+
+class TestDeleteReport:
+    @patch(f"{_UI}.prompt_select")
+    def test_delete_report_confirmed(
+        self,
+        mock_select: MagicMock,
+        app: CostSplitterApp,
+        report_with_spendings: Report,
+    ) -> None:
+        mock_select.return_value = "yes"
+        result = app.delete_report(report_with_spendings)
+        assert result is True
+        assert app.storage.list_reports() == []
+
+    @patch(f"{_UI}.prompt_select")
+    def test_delete_report_declined(
+        self,
+        mock_select: MagicMock,
+        app: CostSplitterApp,
+        report_with_spendings: Report,
+    ) -> None:
+        mock_select.return_value = "no"
+        result = app.delete_report(report_with_spendings)
+        assert result is False
+        assert "holiday" in app.storage.list_reports()
+
+    @patch(f"{_UI}.prompt_action")
+    @patch(f"{_UI}.prompt_select")
+    @patch(f"{_UI}.prompt_report_selection")
+    def test_delete_report_from_startup_returns_to_home(
+        self,
+        mock_report_sel: MagicMock,
+        mock_select: MagicMock,
+        mock_action: MagicMock,
+        app: CostSplitterApp,
+        report_with_spendings: Report,  # noqa: ARG002
+    ) -> None:
+        # Delete report, then on restart select "New report", create it, then quit
+        mock_report_sel.side_effect = [("delete", None), ("new", None)]
+        mock_select.side_effect = ["holiday", "yes"]
+        mock_action.return_value = "quit"
+        # create_report prompts for name and participants
+        with patch(f"{_UI}.prompt_text", side_effect=["New Trip", "A, B"]):
+            app.run()
+        assert "holiday" not in app.storage.list_reports()
+        assert "new-trip" in app.storage.list_reports()
+
+
+class TestCleanExit:
+    @patch(f"{_UI}.prompt_action")
+    @patch(f"{_UI}.prompt_report_selection")
+    @patch(f"{_UI}.print_info")
+    def test_ctrl_c_exits_gracefully(
+        self,
+        mock_info: MagicMock,
+        mock_report_sel: MagicMock,
+        mock_action: MagicMock,
+        app: CostSplitterApp,
+        report_with_spendings: Report,  # noqa: ARG002
+    ) -> None:
+        mock_report_sel.return_value = ("existing", "holiday")
+        mock_action.side_effect = KeyboardInterrupt
+        app.run()
+        mock_info.assert_any_call("\nGoodbye!")
+
+    @patch(f"{_UI}.prompt_report_selection")
+    @patch(f"{_UI}.print_info")
+    def test_ctrl_c_during_report_selection(
+        self,
+        mock_info: MagicMock,
+        mock_report_sel: MagicMock,
+        app: CostSplitterApp,
+    ) -> None:
+        mock_report_sel.side_effect = KeyboardInterrupt
+        app.run()
+        mock_info.assert_any_call("\nGoodbye!")

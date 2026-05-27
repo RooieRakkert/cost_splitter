@@ -84,13 +84,3 @@ class TestReportStorage:
         storage.save(sample_report)
         loaded = storage.load("holiday-trip")
         assert len(loaded.spendings) == 2
-
-    def test_load_all(self, storage: ReportStorage) -> None:
-        r1 = Report(name="Trip A", participants=["A", "B"])
-        r2 = Report(name="Trip B", participants=["C", "D"])
-        storage.save(r1)
-        storage.save(r2)
-        reports = storage.load_all()
-        assert len(reports) == 2
-        names = sorted(r.name for r in reports)
-        assert names == ["Trip A", "Trip B"]

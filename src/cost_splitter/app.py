@@ -6,11 +6,9 @@ from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 
 from . import ui
 from .calculator import calculate_balances, calculate_settlement
-from .models import Report, Spending
+from .exceptions import Cancelled
+from .models import CENTS, Report, Spending
 from .storage import ReportStorage
-from .ui import Cancelled
-
-_CENTS = Decimal("0.01")
 
 
 def _collect_split(
@@ -37,7 +35,7 @@ def _collect_split(
                 continue
             return {
                 p: (amount * pct / Decimal("100")).quantize(
-                    _CENTS, rounding=ROUND_HALF_UP
+                    CENTS, rounding=ROUND_HALF_UP
                 )
                 for p, pct in pcts.items()
             }
@@ -52,6 +50,54 @@ def _collect_split(
             ui.print_error(f"Amounts must sum to {amount}, got {total}.")
             continue
         return custom
+
+
+def _collect_spending_data(
+    report: Report, old: Spending | None = None
+) -> Spending:
+    if old:
+        description = ui.prompt_text(f"Description [{old.description}]:")
+        if not description.strip():
+            description = old.description
+        amount_str = ui.prompt_text(f"Amount [{old.amount}]:")
+        amount = Decimal(amount_str) if amount_str.strip() else old.amount
+    else:
+        description = ui.prompt_text("Description:")
+        amount = Decimal(ui.prompt_text("Amount:"))
+
+    paid_by = ui.prompt_select("Who paid?", report.participants)
+    participants = ui.prompt_checkbox(
+        "Who participates?", report.participants
+    )
+
+    if not participants:
+        ui.print_error("At least one participant required.")
+        raise Cancelled
+
+    custom_amounts = _collect_split(amount, participants)
+
+    return Spending(
+        description=description,
+        amount=amount,
+        paid_by=paid_by,
+        participants=participants,
+        custom_amounts=custom_amounts,
+    )
+
+
+def _select_spending(report: Report, action: str) -> int:
+    if not report.spendings:
+        ui.print_info(f"No spendings to {action}.")
+        raise Cancelled
+
+    choices = [
+        {
+            "name": f"{s.description} ({s.amount:.2f}, paid by {s.paid_by})",
+            "value": i,
+        }
+        for i, s in enumerate(report.spendings)
+    ]
+    return ui.prompt_select(f"{action.capitalize()} which spending?", choices)
 
 
 class CostSplitterApp:
@@ -80,100 +126,48 @@ class CostSplitterApp:
         ui.print_success(f"Added participant '{name}'.")
 
     def add_spending(self, report: Report) -> None:
-        description = ui.prompt_text("Description:")
-
-        amount_str = ui.prompt_text("Amount:")
-        try:
-            amount = Decimal(amount_str)
-        except InvalidOperation:
-            ui.print_error(f"Invalid amount: {amount_str}")
-            return
-
-        paid_by = ui.prompt_select("Who paid?", report.participants)
-        participants = ui.prompt_checkbox(
-            "Who participates?", report.participants
-        )
-
-        if not participants:
-            ui.print_error("At least one participant required.")
-            return
-
-        custom_amounts = _collect_split(amount, participants)
-
-        spending = Spending(
-            description=description,
-            amount=amount,
-            paid_by=paid_by,
-            participants=participants,
-            custom_amounts=custom_amounts,
-        )
+        spending = _collect_spending_data(report)
         report.spendings.append(spending)
         self.storage.save(report)
-        ui.print_success(f"Added: {description} ({amount:.2f})")
+        ui.print_success(f"Added: {spending.description} ({spending.amount:.2f})")
 
     def edit_spending(self, report: Report) -> None:
-        if not report.spendings:
-            ui.print_info("No spendings to edit.")
-            return
-
-        choices = [
-            {
-                "name": f"{s.description} ({s.amount:.2f}, paid by {s.paid_by})",
-                "value": i,
-            }
-            for i, s in enumerate(report.spendings)
-        ]
-        idx = ui.prompt_select("Edit which spending?", choices)
+        idx = _select_spending(report, "edit")
         old = report.spendings[idx]
-
-        description = ui.prompt_text(f"Description [{old.description}]:")
-        if not description.strip():
-            description = old.description
-
-        amount_str = ui.prompt_text(f"Amount [{old.amount}]:")
-        try:
-            amount = Decimal(amount_str) if amount_str.strip() else old.amount
-        except InvalidOperation:
-            ui.print_error(f"Invalid amount: {amount_str}")
-            return
-
-        paid_by = ui.prompt_select("Who paid?", report.participants)
-        participants = ui.prompt_checkbox(
-            "Who participates?", report.participants
-        )
-
-        if not participants:
-            ui.print_error("At least one participant required.")
-            return
-
-        custom_amounts = _collect_split(amount, participants)
-
-        report.spendings[idx] = Spending(
-            description=description,
-            amount=amount,
-            paid_by=paid_by,
-            participants=participants,
-            custom_amounts=custom_amounts,
-        )
+        spending = _collect_spending_data(report, old=old)
+        report.spendings[idx] = spending
         self.storage.save(report)
-        ui.print_success(f"Updated: {description} ({amount:.2f})")
+        ui.print_success(
+            f"Updated: {spending.description} ({spending.amount:.2f})"
+        )
 
     def delete_spending(self, report: Report) -> None:
-        if not report.spendings:
-            ui.print_info("No spendings to delete.")
-            return
-
-        choices = [
-            {
-                "name": f"{s.description} ({s.amount:.2f}, paid by {s.paid_by})",
-                "value": i,
-            }
-            for i, s in enumerate(report.spendings)
-        ]
-        idx = ui.prompt_select("Delete which spending?", choices)
+        idx = _select_spending(report, "delete")
         removed = report.spendings.pop(idx)
         self.storage.save(report)
         ui.print_success(f"Deleted: {removed.description}")
+
+    def delete_report(self, report: Report) -> bool:
+        confirm = ui.prompt_select(
+            f"Delete report '{report.name}' and all its spendings?",
+            [
+                {"name": "Yes, delete", "value": "yes"},
+                {"name": "No, keep it", "value": "no"},
+            ],
+            cancel=False,
+        )
+        if confirm == "yes":
+            self.storage.delete(report.slug)
+            ui.print_success(f"Deleted report '{report.name}'.")
+            return True
+        ui.print_info("Kept report.")
+        return False
+
+    def _delete_report_from_list(self) -> None:
+        slugs = self.storage.list_reports()
+        slug = ui.prompt_select("Delete which report?", slugs)
+        report = self.storage.load(slug)
+        self.delete_report(report)
 
     def view_report(self, report: Report) -> None:
         ui.display_report(report)
@@ -186,21 +180,36 @@ class CostSplitterApp:
     def run(self) -> None:
         ui.print_info("Cost Splitter")
 
-        slugs = self.storage.list_reports()
-        action, slug = ui.prompt_report_selection(slugs)
+        try:
+            self._run_inner()
+        except KeyboardInterrupt:
+            ui.print_info("\nGoodbye!")
 
-        if action == "new":
-            try:
-                report = self.create_report()
-            except Cancelled:
-                ui.print_info("Cancelled.")
-                return
-        else:
-            report = self.storage.load(slug)
-            ui.print_success(
-                f"Loaded '{report.name}' ({len(report.participants)} participants, "
-                f"{len(report.spendings)} spendings)"
-            )
+    def _run_inner(self) -> None:
+        while True:
+            slugs = self.storage.list_reports()
+            action, slug = ui.prompt_report_selection(slugs)
+
+            if action == "new":
+                try:
+                    report = self.create_report()
+                except Cancelled:
+                    ui.print_info("Cancelled.")
+                    continue
+            elif action == "delete":
+                try:
+                    self._delete_report_from_list()
+                except Cancelled:
+                    ui.print_info("Cancelled.")
+                continue
+            else:
+                report = self.storage.load(slug)
+                ui.print_success(
+                    f"Loaded '{report.name}' ({len(report.participants)} participants, "
+                    f"{len(report.spendings)} spendings)"
+                )
+
+            break
 
         while True:
             choice = ui.prompt_action()
@@ -221,5 +230,8 @@ class CostSplitterApp:
                     self.edit_spending(report)
                 elif choice == "participant":
                     self.add_participant(report)
+                elif choice == "remove_report":
+                    if self.delete_report(report):
+                        return self._run_inner()
             except Cancelled:
                 ui.print_info("Cancelled.")

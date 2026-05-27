@@ -12,6 +12,7 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
 
+from .exceptions import Cancelled
 from .models import Report, Transfer  # noqa: TC001
 
 console = Console()
@@ -21,14 +22,11 @@ _ACTION_KEYS: dict[str, str] = {
     "e": "edit",
     "r": "report",
     "s": "settle",
-    "d": "delete",
     "p": "participant",
+    "d": "delete",
+    "x": "remove_report",
     "q": "quit",
 }
-
-
-class Cancelled(Exception):
-    pass
 
 
 def _read_key() -> str:
@@ -60,7 +58,15 @@ def prompt_select(
 ) -> str:  # noqa: FBT001, FBT002
     if cancel:
         choices = [*choices, {"name": "(X) Cancel", "value": "__cancel__"}]
-    result = inquirer.select(message=message, choices=choices, **kwargs).execute()
+    prompt = inquirer.select(message=message, choices=choices, **kwargs)
+    if cancel:
+
+        @prompt.register_kb("x")
+        def _cancel(event: object) -> None:  # noqa: ARG001
+            prompt._result = "__cancel__"
+            prompt._handle_enter(None)
+
+    result = prompt.execute()
     if result == "__cancel__":
         raise Cancelled
     return result
@@ -69,12 +75,19 @@ def prompt_select(
 def prompt_checkbox(message: str, choices: list[str], **kwargs: object) -> list[str]:
     enabled_choices = [{"name": c, "value": c, "enabled": True} for c in choices]
     enabled_choices.append({"name": "(X) Cancel", "value": "__cancel__"})
-    result = inquirer.checkbox(
+    prompt = inquirer.checkbox(
         message=message,
         choices=enabled_choices,
-        instruction="(use SPACE to toggle, ENTER to confirm)",
+        instruction="(use SPACE to toggle, ENTER to confirm, x to cancel)",
         **kwargs,
-    ).execute()
+    )
+
+    @prompt.register_kb("x")
+    def _cancel(event: object) -> None:  # noqa: ARG001
+        prompt._result = ["__cancel__"]
+        prompt._handle_enter(None)
+
+    result = prompt.execute()
     if "__cancel__" in result:
         raise Cancelled
     return result
@@ -84,9 +97,13 @@ def prompt_report_selection(
     report_slugs: list[str],
 ) -> tuple[str, str | None]:
     choices = ["New report", *report_slugs]
+    if report_slugs:
+        choices.append({"name": "Delete a report", "value": "__delete__"})
     result = prompt_select("Select a report:", choices, cancel=False)
     if result == "New report":
         return ("new", None)
+    if result == "__delete__":
+        return ("delete", None)
     return ("existing", result)
 
 
@@ -99,7 +116,8 @@ def prompt_action() -> str:
     console.print("  [cyan](S)[/cyan] Settle up")
     console.print("  [cyan](P)[/cyan] Add participant")
     console.print("  [cyan](D)[/cyan] Delete spending")
-    console.print("  [cyan](Q)[/cyan] Quit")
+    console.print("  [cyan](X)[/cyan] Delete report")
+    console.print("  [cyan](Q)[/cyan] Quit  [dim](or Ctrl+C)[/dim]")
     console.print()
 
     while True:
