@@ -175,7 +175,7 @@ class CostSplitterApp:
     def settle(self, report: Report) -> None:
         balances = calculate_balances(report)
         transfers = calculate_settlement(report)
-        ui.display_settlement(transfers, balances)
+        ui.display_settlement(transfers, balances, report)
 
     def run(self) -> None:
         ui.print_info("Cost Splitter")

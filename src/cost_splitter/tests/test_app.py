@@ -244,11 +244,13 @@ class TestSettle:
         mock_display.assert_called_once()
         transfers = mock_display.call_args[0][0]
         balances = mock_display.call_args[0][1]
+        report = mock_display.call_args[0][2]
         assert len(transfers) == 2
         total = sum(t.amount for t in transfers)
         assert total == Decimal("40.00")
         assert isinstance(balances, dict)
         assert "Bouke" in balances
+        assert report.name == "Holiday"
 
 
 class TestMainLoop:

@@ -62,9 +62,10 @@ def prompt_select(
     if cancel:
 
         @prompt.register_kb("x")
-        def _cancel(event: object) -> None:  # noqa: ARG001
-            prompt._result = "__cancel__"
-            prompt._handle_enter(None)
+        def _cancel(event: object) -> None:
+            prompt.status["answered"] = True
+            prompt.status["result"] = ["(X) Cancel"]
+            event.app.exit(result="__cancel__")
 
     result = prompt.execute()
     if result == "__cancel__":
@@ -83,9 +84,10 @@ def prompt_checkbox(message: str, choices: list[str], **kwargs: object) -> list[
     )
 
     @prompt.register_kb("x")
-    def _cancel(event: object) -> None:  # noqa: ARG001
-        prompt._result = ["__cancel__"]
-        prompt._handle_enter(None)
+    def _cancel(event: object) -> None:
+        prompt.status["answered"] = True
+        prompt.status["result"] = ["(X) Cancel"]
+        event.app.exit(result=["__cancel__"])
 
     result = prompt.execute()
     if "__cancel__" in result:
@@ -161,8 +163,24 @@ def display_report(report: Report) -> None:
 
 
 def display_settlement(
-    transfers: list[Transfer], balances: dict[str, Decimal]
+    transfers: list[Transfer], balances: dict[str, Decimal], report: Report
 ) -> None:
+    total_spent = sum(s.amount for s in report.spendings)
+
+    spent_per_person: dict[str, Decimal] = {p: Decimal("0") for p in report.participants}
+    for s in report.spendings:
+        spent_per_person[s.paid_by] += s.amount
+
+    console.print()
+    summary = Table(title="Spending Summary", show_lines=False)
+    summary.add_column("Participant")
+    summary.add_column("Total paid", justify="right")
+    for p in report.participants:
+        summary.add_row(p, f"{spent_per_person[p]:.2f}")
+    summary.add_section()
+    summary.add_row("[bold]Total[/bold]", f"[bold]{total_spent:.2f}[/bold]")
+    console.print(summary)
+
     if not transfers:
         console.print(
             Panel("Everyone is settled up!", style="green", title="Settlement")
