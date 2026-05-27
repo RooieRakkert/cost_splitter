@@ -167,19 +167,35 @@ def display_settlement(
 ) -> None:
     total_spent = sum(s.amount for s in report.spendings)
 
-    spent_per_person: dict[str, Decimal] = {p: Decimal("0") for p in report.participants}
+    paid_per_person: dict[str, Decimal] = {p: Decimal("0") for p in report.participants}
+    owed_per_person: dict[str, Decimal] = {p: Decimal("0") for p in report.participants}
     for s in report.spendings:
-        spent_per_person[s.paid_by] += s.amount
+        paid_per_person[s.paid_by] += s.amount
+        if s.custom_amounts:
+            for person, amount in s.custom_amounts.items():
+                owed_per_person[person] += amount
+        else:
+            share = (s.amount / len(s.participants)).quantize(Decimal("0.01"))
+            for person in s.participants:
+                owed_per_person[person] += share
 
     console.print()
     summary = Table(title="Spending Summary", show_lines=False)
     summary.add_column("Participant")
     summary.add_column("Total paid", justify="right")
     for p in report.participants:
-        summary.add_row(p, f"{spent_per_person[p]:.2f}")
+        summary.add_row(p, f"{paid_per_person[p]:.2f}")
     summary.add_section()
     summary.add_row("[bold]Total[/bold]", f"[bold]{total_spent:.2f}[/bold]")
     console.print(summary)
+
+    console.print()
+    individual = Table(title="Individual Spending Summary", show_lines=False)
+    individual.add_column("Participant")
+    individual.add_column("Total share", justify="right")
+    for p in report.participants:
+        individual.add_row(p, f"{owed_per_person[p]:.2f}")
+    console.print(individual)
 
     if not transfers:
         console.print(
