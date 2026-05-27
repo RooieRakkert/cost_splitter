@@ -1,6 +1,6 @@
 # Cost Splitter
 
-Interactive CLI tool for splitting shared expenses among a group of people.
+Split shared expenses among a group of people. Available as both an interactive CLI tool and a web app.
 
 ## Features
 
@@ -8,10 +8,27 @@ Interactive CLI tool for splitting shared expenses among a group of people.
 - **Equal, custom, or percentage splits** — split evenly, by exact amounts, or by percentage
 - **Debt simplification** — minimizes the number of transfers needed to settle up
 - **Spending summary** — see total expenditure and per-person breakdown
-- **Interactive menus** — arrow keys and keyboard shortcuts throughout
-- **JSON storage** — reports saved as human-readable JSON in `./reports/`
+- **Two interfaces** — CLI for terminal users, web app for browser users
 
-## Setup
+## Web App
+
+**Live at: https://rooierakkert.github.io/cost_splitter/**
+
+No installation needed — runs entirely in the browser. Reports are stored in localStorage.
+
+To run locally:
+
+```bash
+cd web
+python3 -m http.server 8000
+# Open http://localhost:8000
+```
+
+See [web/README.md](web/README.md) for architecture details.
+
+## CLI
+
+### Setup
 
 ```bash
 python3 -m venv .venv
@@ -19,7 +36,7 @@ source .venv/bin/activate
 pip install -e .
 ```
 
-## Usage
+### Usage
 
 ```bash
 python -m cost_splitter
@@ -31,14 +48,14 @@ Or via the installed command:
 cost-splitter
 ```
 
-## How it works
+### How it works
 
 1. **Select, create, or delete a report** — on startup, pick an existing report, create a new one, or delete one
 2. **Main menu** — press a key to choose an action:
    - `A` — Add a spending
    - `E` — Edit an existing spending
    - `R` — View the full spending report as a table
-   - `S` — Settle up (spending summary + simplified transfers)
+   - `S` — Settle up (simplified transfers)
    - `P` — Add a new participant
    - `D` — Delete a spending
    - `X` — Delete the entire report

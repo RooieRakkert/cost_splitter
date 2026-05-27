@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cost Splitter</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="app">
+    <header>
+      <h1>Cost Splitter</h1>
+    </header>
+
+    <!-- Home Screen -->
+    <section id="view-home" class="view">
+      <h2>Your Reports</h2>
+      <div id="report-list"></div>
+      <button class="btn btn-primary" onclick="showNewReportForm()">New Report</button>
+
+      <div id="new-report-form" class="form-card hidden">
+        <h3>Create Report</h3>
+        <label>Report name
+          <input type="text" id="new-report-name" placeholder="e.g. Holiday Trip 2026">
+        </label>
+        <label>Participants (comma-separated)
+          <input type="text" id="new-report-participants" placeholder="e.g. Bouke, Jan, Karel">
+        </label>
+        <div class="btn-row">
+          <button class="btn btn-primary" onclick="createNewReport()">Create</button>
+          <button class="btn btn-secondary" onclick="hideNewReportForm()">Cancel</button>
+        </div>
+        <p id="new-report-error" class="error hidden"></p>
+      </div>
+    </section>
+
+    <!-- Report View -->
+    <section id="view-report" class="view hidden">
+      <div class="report-header">
+        <h2 id="report-title"></h2>
+        <button class="btn btn-secondary btn-sm" onclick="goHome()">Back</button>
+      </div>
+
+      <div class="participants-bar">
+        <span id="participants-list"></span>
+        <button class="btn btn-secondary btn-sm" onclick="showAddParticipant()">+ Participant</button>
+      </div>
+      <div id="add-participant-form" class="inline-form hidden">
+        <input type="text" id="new-participant-name" placeholder="Name">
+        <button class="btn btn-primary btn-sm" onclick="addParticipant()">Add</button>
+        <button class="btn btn-secondary btn-sm" onclick="hideAddParticipant()">Cancel</button>
+      </div>
+
+      <div id="spendings-section">
+        <h3>Spendings</h3>
+        <table id="spendings-table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Description</th>
+              <th class="num">Amount</th>
+              <th>Paid by</th>
+              <th>Split among</th>
+              <th class="num">Each owes</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="spendings-body"></tbody>
+        </table>
+        <p id="no-spendings" class="muted hidden">No spendings yet.</p>
+      </div>
+
+      <div id="summaries-section" class="hidden">
+        <div class="summary-tables">
+          <div>
+            <h3>Spending Summary</h3>
+            <table id="spending-summary-table">
+              <thead><tr><th>Participant</th><th class="num">Total paid</th></tr></thead>
+              <tbody id="spending-summary-body"></tbody>
+              <tfoot id="spending-summary-foot"></tfoot>
+            </table>
+          </div>
+          <div>
+            <h3>Individual Spending Summary</h3>
+            <table id="individual-summary-table">
+              <thead><tr><th>Participant</th><th class="num">Total share</th></tr></thead>
+              <tbody id="individual-summary-body"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div class="btn-row">
+        <button class="btn btn-primary" onclick="showSpendingForm()">Add Spending</button>
+        <button class="btn btn-primary" onclick="showSettlement()">Settle Up</button>
+        <button class="btn btn-danger" onclick="deleteCurrentReport()">Delete Report</button>
+      </div>
+
+      <!-- Add/Edit Spending Form -->
+      <div id="spending-form" class="form-card hidden">
+        <h3 id="spending-form-title">Add Spending</h3>
+        <input type="hidden" id="spending-edit-index" value="-1">
+        <label>Description
+          <input type="text" id="spending-description" placeholder="e.g. Dinner">
+        </label>
+        <label>Amount
+          <input type="number" id="spending-amount" step="0.01" min="0.01" placeholder="0.00">
+        </label>
+        <label>Who paid?
+          <select id="spending-paid-by"></select>
+        </label>
+        <fieldset id="spending-participants-fieldset">
+          <legend>Who participates?</legend>
+          <div id="spending-participants-checks"></div>
+        </fieldset>
+        <fieldset>
+          <legend>Split type</legend>
+          <div class="radio-row">
+            <label><input type="radio" name="split-type" value="equal" checked onchange="onSplitTypeChange()"> Equal</label>
+            <label><input type="radio" name="split-type" value="custom" onchange="onSplitTypeChange()"> Custom</label>
+            <label><input type="radio" name="split-type" value="percentage" onchange="onSplitTypeChange()"> Percentage</label>
+          </div>
+        </fieldset>
+        <div id="custom-amounts-section" class="hidden">
+          <div id="custom-amounts-inputs"></div>
+          <p id="split-error" class="error hidden"></p>
+        </div>
+        <div class="btn-row">
+          <button class="btn btn-primary" onclick="saveSpending()">Save</button>
+          <button class="btn btn-secondary" onclick="hideSpendingForm()">Cancel</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Settlement View -->
+    <section id="view-settlement" class="view hidden">
+      <h2>Settlement</h2>
+      <div id="settlement-content"></div>
+      <button class="btn btn-secondary" onclick="hideSettlement()">Back to Report</button>
+    </section>
+  </div>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>
